@@ -1,0 +1,130 @@
+# pgback configuration
+#
+# String values may reference environment variables as ${VAR} or ${VAR:-default}
+# (use $$ for a literal $). Keep this file at mode 0600: it holds repository and
+# notification secrets. Under systemd, put the variables in /etc/pgback/pgback.env.
+
+# Identifies this host in alerts, metrics and repository paths ({host}).
+# Defaults to the system hostname.
+# host_id: db-host-01
+
+docker:
+  # Every endpoint is scanned for running containers labelled `<label_prefix>.enable=true`.
+  # Run one pgback per host against its local socket (recommended), or list remote
+  # daemons here to drive several hosts from one scheduler.
+  endpoints:
+    - name: local
+      url: unix:///var/run/docker.sock
+    # - name: db-host-02
+    #   url: tcp://10.0.0.12:2376
+    #   tls: { ca: /etc/pgback/tls/ca.pem, cert: /etc/pgback/tls/cert.pem, key: /etc/pgback/tls/key.pem }
+  label_prefix: pg.backup
+  timeout_secs: 120
+
+pgbackrest:
+  # pgBackRest runs inside each PostgreSQL container. `pgback --config_sync` renders
+  # this file per container and writes it there (owned by exec_user, mode 0640).
+  config_path: /etc/pgbackrest/pgbackrest.conf
+  exec_user: postgres
+  # Fallbacks for containers that do not set PGDATA / PGPORT / POSTGRES_USER.
+  # The postgres:18 images use /var/lib/postgresql/18/docker.
+  pg_path: /var/lib/postgresql/18/docker
+  pg_port: 5432
+  process_max: 2
+  compress_type: zst
+  compress_level: 3
+  start_fast: true
+  log_level_console: info
+  log_level_file: "off"
+  # Create the stanza automatically the first time a container is backed up.
+  auto_stanza_create: true
+  # Set archive_command to pgBackRest via ALTER SYSTEM during --config_sync.
+  # archive_mode=on still requires a PostgreSQL restart to take effect.
+  manage_archive_command: false
+
+  repos:
+    # A volume mounted at /var/lib/pgbackrest inside each container.
+    - type: posix
+      path: /var/lib/pgbackrest
+      retention_full: 2
+
+    # Object storage. {host} keeps stanzas from different hosts apart in a shared bucket.
+    # - type: s3
+    #   path: /pgbackrest/{host}
+    #   retention_full: 14d          # a count (4) or whole days (14d, 2w)
+    #   cipher_pass: ${PGBACK_CIPHER_PASS}
+    #   s3:
+    #     bucket: my-pg-backups
+    #     region: us-east-1
+    #     key: ${AWS_ACCESS_KEY_ID}
+    #     key_secret: ${AWS_SECRET_ACCESS_KEY}
+    #     # uri_style: path           # MinIO
+    #     # endpoint: minio.internal:9000
+    #   options:
+    #     bundle: y
+    #     block: y
+
+  # Extra pgBackRest options, written verbatim to [global] and the stanza section.
+  global_options: {}
+  stanza_options: {}
+
+backup:
+  # Full backups follow this cron schedule (5 fields, local time).
+  # Override per container with the `pg.backup.schedule` label.
+  schedule: "0 2 * * 0"
+  # The daemon (and `pgback run --if_due`) takes an incremental this long after the
+  # previous backup. "0" disables incrementals. Label: `pg.backup.incremental_interval`.
+  incremental_backup_interval: 6h
+  # Backups running at once on this host.
+  max_parallel: 2
+  # Abort a backup that runs longer than this. "0" disables.
+  timeout: "0"
+  # After a failure, wait retry_backoff (doubling per failure, capped) before retrying.
+  retry_backoff: 15m
+  retry_max_backoff: 6h
+
+hooks:
+  # Executables in pre-backup.d/ and post-backup.d/ run in lexical order around each
+  # backup. A failing pre-backup hook aborts that backup. Scaffold one with
+  # `pgback --create_pre_hook 10-name`.
+  dir: /etc/pgback/hooks
+  timeout: 10m
+
+notifications:
+  # When to alert: [failure], [success], or both.
+  notify_on: [failure]
+  # slack:
+  #   webhook_url: ${PGBACK_SLACK_WEBHOOK}
+  # google_chat:
+  #   webhook_url: ${PGBACK_GOOGLE_CHAT_WEBHOOK}
+  # email:
+  #   method: aws                  # aws = Amazon SES SMTP, mail = any SMTP relay
+  #   from: pgback@example.com
+  #   to: [dba@example.com]
+  #   aws_region: us-east-1
+  #   access_key: ${PGBACK_EMAIL_SEND_ACCESS_KEY}
+  #   secret_key: ${PGBACK_EMAIL_SEND_SECRET_KEY}
+  #   # method: mail
+  #   # smtp_host: smtp.example.com
+  #   # smtp_port: 587
+  #   # smtp_tls: starttls         # none | opportunistic | starttls | tls
+  #   # smtp_username: pgback
+  #   # smtp_password: ${SMTP_PASSWORD}
+
+monitoring:
+  # Per-target results of the latest runs (also read by `pgback status_all`).
+  metrics_file: /var/log/pgback/metrics.json
+  # prometheus_textfile: /var/lib/node_exporter/textfile_collector/pgback.prom
+  # While the daemon runs: GET /health (liveness), /status (503 when a target is
+  # failing) and /metrics (Prometheus). Remove the line to disable.
+  listen: 0.0.0.0:8000
+
+daemon:
+  pid_file: /run/pgback.pid
+  log_file: /var/log/pgback/daemon.log
+  # How often containers are re-discovered; new ones are picked up automatically.
+  discovery_interval: 60s
+  # Push pgbackrest.conf to new or changed containers without a manual --config_sync.
+  auto_config_sync: true
+  # On SIGTERM, wait this long for running backups before exiting.
+  shutdown_timeout: 5m

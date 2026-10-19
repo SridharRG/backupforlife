@@ -1,0 +1,36 @@
+# PostgreSQL 18 with pgBackRest, opted in to pgback via labels.
+#
+#   docker compose -f examples/docker-compose.yml up -d --build
+#   pgback --config_sync run
+services:
+  db_prod:
+    build:
+      context: ./docker
+      args:
+        PG_IMAGE: postgres:18-alpine
+    image: local/postgres-pgbackrest:18
+    environment:
+      POSTGRES_PASSWORD: change-me
+    # archive_command must match the stanza (the container name unless pg.backup.stanza is set).
+    # Alternatively set pgbackrest.manage_archive_command: true and let --config_sync do it.
+    command:
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=db_prod archive-push %p
+    labels:
+      - "pg.backup.enable=true"
+      - "pg.backup.stanza=db_prod"
+      - "pg.backup.schedule=0 2 * * 0"        # weekly full, Sunday 02:00
+      - "pg.backup.incremental_interval=6h"   # incrementals in between
+      - "pg.backup.retention=14d"
+    volumes:
+      # postgres:18 images keep data under /var/lib/postgresql/18/docker.
+      - pgdata:/var/lib/postgresql
+      # posix repository; use an s3/gcs/azure repo in the pgback config instead for off-host copies.
+      - pgbackrest-repo:/var/lib/pgbackrest
+    container_name: db_prod
+
+volumes:
+  pgdata:
+  pgbackrest-repo:

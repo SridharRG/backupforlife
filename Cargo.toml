@@ -1,0 +1,45 @@
+[package]
+name = "pgback"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Fleet orchestration for pgBackRest: Docker label discovery, config sync, scheduling, lifecycle hooks and Slack / Google Chat / email alerting"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/SridharRG/backupforlife"
+keywords = ["postgresql", "pgbackrest", "backup", "docker", "cli"]
+categories = ["command-line-utilities", "database"]
+include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE", "examples/**/*"]
+
+[[bin]]
+name = "pgback"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+base64 = "0.23.1"
+bollard = { version = "0.21.1", features = ["ssl"] }
+bytes = "1.12.1"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std", "serde"] }
+clap = { version = "4.6.7", features = ["derive", "env", "wrap_help"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+hmac = "0.13.0"
+lettre = { version = "0.11.23", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls", "hostname"] }
+libc = "0.2.191"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_yaml_ng = "0.10.0"
+sha2 = "0.11.1"
+tar = "0.4.46"
+tokio = { version = "1.54.0", features = ["rt-multi-thread", "macros", "process", "signal", "time", "fs", "net", "io-util", "sync"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter", "fmt"] }
+webpki-roots = "1.0.9"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
