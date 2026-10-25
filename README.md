@@ -30,6 +30,9 @@ CLI, no PostgreSQL client and no runtime libraries**, just the binary.
 
 [pgBackRest]: https://pgbackrest.org
 
+> **New here?** [docs.md](docs.md) is a step-by-step guide: install on a server, detect
+> databases, back up to S3, alerts in Google Chat, automatic scheduling and restores.
+
 ## Contents
 
 - [Install](#install)

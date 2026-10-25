@@ -274,7 +274,10 @@ pub struct BackupRecord {
     pub started_at: DateTime<Utc>,
     pub finished_at: DateTime<Utc>,
     pub size_bytes: u64,
-    pub repo_size_bytes: u64,
+    /// Repository size including referenced files; pgBackRest omits it for bundled repos.
+    pub repo_size_bytes: Option<u64>,
+    /// Bytes this backup added to the repository (after compression and encryption).
+    pub repo_delta_bytes: u64,
     /// pgBackRest found page checksum errors in this backup.
     pub error: bool,
 }
@@ -375,7 +378,9 @@ struct RawSizes {
 #[derive(Deserialize, Default)]
 struct RawRepoSize {
     #[serde(default)]
-    size: u64,
+    size: Option<u64>,
+    #[serde(default)]
+    delta: u64,
 }
 
 pub fn parse_info(json: &str) -> Result<Vec<StanzaInfo>> {
@@ -394,6 +399,7 @@ pub fn parse_info(json: &str) -> Result<Vec<StanzaInfo>> {
                     finished_at: epoch(b.timestamp.stop),
                     size_bytes: b.info.size,
                     repo_size_bytes: b.info.repository.size,
+                    repo_delta_bytes: b.info.repository.delta,
                     error: b.error.unwrap_or(false),
                 })
                 .collect();
@@ -441,7 +447,9 @@ mod tests {
         assert_eq!(s.backups.len(), 2);
         assert_eq!(s.backups[0].kind, BackupType::Full, "sorted oldest first");
         assert_eq!(s.backups[0].size_bytes, 31_457_280);
-        assert_eq!(s.backups[0].repo_size_bytes, 4_194_304);
+        assert_eq!(s.backups[0].repo_size_bytes, Some(4_194_304));
+        assert_eq!(s.backups[0].repo_delta_bytes, 4_194_304);
+        assert_eq!(s.backups[1].repo_delta_bytes, 1024);
         let h = s.history();
         assert_eq!(h.last_full_start.unwrap().timestamp(), 1_760_832_000);
         assert_eq!(h.last_backup_start.unwrap().timestamp(), 1_760_853_600);
@@ -449,6 +457,16 @@ mod tests {
             s.latest().unwrap().label,
             "20261019-020000F_20261019-080000I"
         );
+    }
+
+    #[test]
+    fn bundled_repos_report_delta_only() {
+        let json = r#"[{"backup":[{"label":"20261019-181918F","type":"full","error":false,
+            "info":{"delta":33729594,"repository":{"delta":3968160,"delta-map":34744,"size-map":34744},"size":33729594},
+            "timestamp":{"start":1760897958,"stop":1760897961}}],"name":"shop","status":{"code":0,"message":"ok"}}]"#;
+        let b = &parse_info(json).unwrap()[0].backups[0];
+        assert_eq!(b.repo_size_bytes, None);
+        assert_eq!(b.repo_delta_bytes, 3_968_160);
     }
 
     #[test]

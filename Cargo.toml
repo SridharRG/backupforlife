@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/SridharRG/backupforlife"
 keywords = ["postgresql", "pgbackrest", "backup", "docker", "cli"]
 categories = ["command-line-utilities", "database"]
-include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE", "examples/**/*"]
+include = ["src/**/*", "README.md", "docs.md", "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE", "examples/**/*"]
 
 [[bin]]
 name = "pgback"

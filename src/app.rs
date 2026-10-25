@@ -570,7 +570,7 @@ async fn history(ctx: &Ctx, format: OutputFormat) -> Result<Outcome> {
                 local_time(b.started_at),
                 format_duration(duration),
                 human_bytes(b.size_bytes),
-                human_bytes(b.repo_size_bytes),
+                human_bytes(b.repo_delta_bytes),
                 if b.error {
                     "checksum errors".into()
                 } else {
@@ -581,14 +581,7 @@ async fn history(ctx: &Ctx, format: OutputFormat) -> Result<Outcome> {
     }
     table::print(
         &[
-            "TARGET",
-            "LABEL",
-            "TYPE",
-            "STARTED",
-            "DURATION",
-            "SIZE",
-            "REPO SIZE",
-            "NOTE",
+            "TARGET", "LABEL", "TYPE", "STARTED", "DURATION", "SIZE", "STORED", "NOTE",
         ],
         &rows,
     );

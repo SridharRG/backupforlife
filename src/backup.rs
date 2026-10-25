@@ -367,7 +367,7 @@ pub async fn run_job(ctx: &Ctx, target: &Target, reason: &str) -> JobResult {
                 if let Some(latest) = info.latest() {
                     result.label = Some(latest.label.clone());
                     result.size_bytes = Some(latest.size_bytes);
-                    result.repo_size_bytes = Some(latest.repo_size_bytes);
+                    result.repo_size_bytes = latest.repo_size_bytes;
                 }
             }
         }
